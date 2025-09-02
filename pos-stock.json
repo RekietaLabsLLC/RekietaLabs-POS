@@ -15,7 +15,7 @@
     "id": "prod003",
     "name": "Bacon Burger",
     "price": 7,
-    "stock": 10
+    "stock": 9
   },
   {
     "id": "prod004",
@@ -45,7 +45,7 @@
     "id": "prod008",
     "name": "Vanilla Ice Cream",
     "price": 3,
-    "stock": 13
+    "stock": 12
   },
   {
     "id": "prod009",
@@ -69,7 +69,7 @@
     "id": "prod012",
     "name": "Chocolate Milkshake",
     "price": 4,
-    "stock": 18
+    "stock": 17
   },
   {
     "id": "prod013",
