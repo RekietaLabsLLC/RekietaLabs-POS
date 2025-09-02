@@ -8,28 +8,60 @@
     body {
       font-family: Arial, sans-serif;
       background: #0a0a0a;
-      color: #00ffcc;
+      color: #1753aa; /* Brand Color */
       text-align: center;
       padding: 50px;
     }
     .hidden { display: none; }
+    img.logo {
+      width: 120px;
+      border-radius: 50%;
+      margin-bottom: 20px;
+    }
+    h1, h2, h3 {
+      color: #1753aa;
+    }
     input, button {
       padding: 10px;
       margin: 10px;
       border-radius: 8px;
-      border: 1px solid #00ffcc;
+      border: 1px solid #1753aa;
       background: #111;
-      color: #00ffcc;
+      color: #1753aa;
+      transition: background 0.3s, color 0.3s;
     }
-    button { cursor: pointer; }
+    button:hover {
+      background: #1753aa;
+      color: #fff;
+    }
     #cart { margin-top: 20px; }
     .cart-item { margin: 5px 0; }
+    /* Loading animation */
+    .loader {
+      border: 6px solid #111;
+      border-top: 6px solid #1753aa;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .nav-bar {
+      margin-top: 20px;
+    }
   </style>
 </head>
 <body>
+  <img src="IMG_0926.jpeg" alt="RekietaLabs Logo" class="logo">
   <h1 id="main-title">Hello! Welcome to RekietaLabs POS.</h1>
   <h3 id="subtitle">System Loading...</h3>
+  <div class="loader" id="loading-spinner"></div>
 
+  <!-- PIN LOGIN -->
   <div id="pin-screen" class="hidden">
     <h2>Enter Employee PIN</h2>
     <input type="password" id="pin-input" placeholder="Enter PIN">
@@ -37,6 +69,7 @@
     <p id="pin-error" style="color:red;"></p>
   </div>
 
+  <!-- POS SCREEN -->
   <div id="pos-screen" class="hidden">
     <h2>Products</h2>
     <div id="products"></div>
@@ -44,15 +77,24 @@
     <h2>Cart</h2>
     <div id="cart"></div>
 
-    <button onclick="checkout()">Checkout</button>
+    <div class="nav-bar">
+      <button onclick="checkout()">Checkout</button>
+      <button onclick="signOut()">Sign Out</button>
+    </div>
   </div>
 
+  <!-- CHECKOUT SCREEN -->
   <div id="checkout-screen" class="hidden">
     <h2>Checkout</h2>
     <label>Email (optional): <input type="email" id="customer-email"></label><br>
     <button onclick="finishCheckout('Card')">💳 Card</button>
     <button onclick="finishCheckout('Cash')">💵 Cash</button>
     <p id="checkout-result"></p>
+
+    <div class="nav-bar">
+      <button onclick="backToPOS()">⬅️ Back</button>
+      <button onclick="signOut()">Sign Out</button>
+    </div>
   </div>
 
 <script>
@@ -61,20 +103,17 @@
     ? "http://localhost:10000"
     : "https://api.rekietalabs.com";
 
+  // --- State ---
+  let cart = [];
+  let stock = [];
+
   // --- Startup ---
   setTimeout(() => {
     document.title = "RekietaLabs POS - Login";
     document.getElementById("subtitle").classList.add("hidden");
+    document.getElementById("loading-spinner").classList.add("hidden");
     document.getElementById("pin-screen").classList.remove("hidden");
-  }, 5000);
-
-  // --- State ---
-  let cart = [];
-  let stock = [
-    { name: "Apple", price: 1.00, stock: 10 },
-    { name: "Banana", price: 0.50, stock: 15 },
-    { name: "Carrot", price: 0.25, stock: 20 }
-  ];
+  }, 3000);
 
   // --- PIN Login ---
   async function login() {
@@ -99,16 +138,23 @@
     }
   }
 
-  // --- Load Products ---
-  function loadProducts() {
-    const container = document.getElementById("products");
-    container.innerHTML = "";
-    stock.forEach((item, idx) => {
-      const btn = document.createElement("button");
-      btn.innerText = `${item.name} - $${item.price} (${item.stock} left)`;
-      btn.onclick = () => addToCart(idx);
-      container.appendChild(btn);
-    });
+  // --- Load Products from JSON ---
+  async function loadProducts() {
+    try {
+      const res = await fetch("pos-stock.json");
+      stock = await res.json();
+
+      const container = document.getElementById("products");
+      container.innerHTML = "";
+      stock.forEach((item, idx) => {
+        const btn = document.createElement("button");
+        btn.innerText = `${item.name} - $${item.price.toFixed(2)} (${item.stock} left)`;
+        btn.onclick = () => addToCart(idx);
+        container.appendChild(btn);
+      });
+    } catch (err) {
+      alert("Error loading products.");
+    }
   }
 
   // --- Cart ---
@@ -117,9 +163,9 @@
     if (product.stock <= 0) return alert("Out of stock!");
     product.stock -= 1;
 
-    const existing = cart.find(c => c.name === product.name);
+    const existing = cart.find(c => c.id === product.id);
     if (existing) existing.qty++;
-    else cart.push({ name: product.name, qty: 1 });
+    else cart.push({ id: product.id, name: product.name, qty: 1 });
 
     renderCart();
     loadProducts();
@@ -155,12 +201,30 @@
       if (data.success) {
         document.getElementById("checkout-result").innerHTML =
           `✅ Success! <a href="${data.receiptUrl}" target="_blank">View Receipt</a>`;
+        cart = [];
+        renderCart();
       } else {
         document.getElementById("checkout-result").innerText = "❌ " + data.message;
       }
     } catch (err) {
       document.getElementById("checkout-result").innerText = "Error contacting API.";
     }
+  }
+
+  // --- Navigation ---
+  function backToPOS() {
+    document.getElementById("checkout-screen").classList.add("hidden");
+    document.getElementById("pos-screen").classList.remove("hidden");
+    document.title = "RekietaLabs POS - Active";
+  }
+
+  function signOut() {
+    cart = [];
+    stock = [];
+    document.getElementById("pos-screen").classList.add("hidden");
+    document.getElementById("checkout-screen").classList.add("hidden");
+    document.getElementById("pin-screen").classList.remove("hidden");
+    document.title = "RekietaLabs POS - Login";
   }
 </script>
 </body>
