@@ -2,103 +2,55 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RekietaLabs POS - Loading</title>
   <link rel="icon" href="IMG_0926.jpeg" type="image/jpeg">
   <style>
-    :root {
-      --brand-color: #1753aa;
-      --bg-color: #0a0a0a;
-      --text-color: #ffffff;
-      --input-bg: #111;
-      --input-border: #1753aa;
-    }
-
     body {
       font-family: Arial, sans-serif;
-      background: var(--bg-color);
-      color: var(--text-color);
+      background: #0a0a0a;
+      color: #1753aa;
+      text-align: center;
+      padding: 50px;
       margin: 0;
-      padding: 0;
     }
-
-    /* --- Full-page screens --- */
-    .screen {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      background: var(--bg-color);
-      z-index: 9999;
-    }
-
     .hidden { display: none; }
-
-    h1, h2, h3 { margin: 10px; }
-
-    /* --- Logo --- */
-    #loading-logo, #pos-logo {
-      width: 120px;
-      height: 120px;
-      background: url('IMG_0926.jpeg') no-repeat center/contain;
-      border-radius: 50%;
-      margin-bottom: 20px;
-    }
-
-    /* --- Inputs & Buttons --- */
     input, button {
       padding: 10px;
       margin: 10px;
       border-radius: 8px;
-      border: 1px solid var(--input-border);
-      background: var(--input-bg);
-      color: var(--brand-color);
-      font-size: 16px;
-    }
-
-    button { cursor: pointer; }
-
-    /* --- POS layout --- */
-    #products, #cart {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 10px;
-      margin-top: 20px;
-    }
-
-    .product-btn {
-      padding: 10px 15px;
-      border: 1px solid var(--brand-color);
+      border: 1px solid #1753aa;
       background: #111;
-      color: var(--brand-color);
-      border-radius: 6px;
-      min-width: 150px;
+      color: #1753aa;
     }
-
+    button { cursor: pointer; }
+    #cart { margin-top: 20px; }
     .cart-item { margin: 5px 0; }
-
-    #checkout-result { margin-top: 15px; color: var(--brand-color); }
-
-    #signout-btn { position: absolute; top: 20px; right: 20px; }
-
-    /* --- Checkout buttons --- */
-    #checkout-screen button { min-width: 120px; }
+    .low-stock { color: red; font-weight: bold; }
+    #logo-circle {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      margin: 20px auto;
+      background: url('IMG_0926.jpeg') no-repeat center/cover;
+    }
+    #products button {
+      display: block;
+      width: 250px;
+      margin: 10px auto;
+      text-align: left;
+    }
   </style>
 </head>
 <body>
-
   <!-- Loading Screen -->
-  <div id="loading-screen" class="screen">
-    <div id="loading-logo"></div>
-    <h1>Welcome to RekietaLabs POS</h1>
-    <h3>System Loading...</h3>
+  <div id="loading-screen">
+    <div id="logo-circle"></div>
+    <h1>Hello! Welcome to RekietaLabs POS.</h1>
+    <h3 id="subtitle">System Loading...</h3>
   </div>
 
-  <!-- PIN Login Screen -->
-  <div id="pin-screen" class="screen hidden">
+  <!-- PIN Screen -->
+  <div id="pin-screen" class="hidden">
     <h2>Enter Employee PIN</h2>
     <input type="password" id="pin-input" placeholder="Enter PIN">
     <button onclick="login()">Login</button>
@@ -106,8 +58,8 @@
   </div>
 
   <!-- POS Screen -->
-  <div id="pos-screen" class="screen hidden">
-    <div id="pos-logo"></div>
+  <div id="pos-screen" class="hidden">
+    <button onclick="signOut()">Sign Out</button>
     <h2>Products</h2>
     <div id="products"></div>
 
@@ -115,13 +67,12 @@
     <div id="cart"></div>
 
     <button onclick="checkout()">Checkout</button>
-    <button id="signout-btn" onclick="signOut()">Sign Out</button>
   </div>
 
   <!-- Checkout Screen -->
-  <div id="checkout-screen" class="screen hidden">
+  <div id="checkout-screen" class="hidden">
     <h2>Checkout</h2>
-    <label>Email (optional): <input type="email" id="customer-email" placeholder="customer@example.com"></label><br>
+    <label>Email (optional): <input type="email" id="customer-email"></label><br>
     <button onclick="finishCheckout('Card')">💳 Card</button>
     <button onclick="finishCheckout('Cash')">💵 Cash</button>
     <p id="checkout-result"></p>
@@ -129,143 +80,172 @@
   </div>
 
 <script>
-  const API_BASE = window.location.hostname.includes("localhost")
-    ? "http://localhost:10000"
-    : "https://api.rekietalabs.com";
+const API_BASE = window.location.hostname.includes("localhost")
+  ? "http://localhost:10000"
+  : "https://api.rekietalabs.com";
 
-  let stock = [];
-  let cart = [];
-  const pins = ["7606","4646"];
+let cart = [];
+let stock = []; // real stock from pos-stock.json
+let tempStock = []; // temporary stock for UI
 
-  // --- Startup: Load Stock ---
-  async function init() {
-    try {
-      const res = await fetch('pos-stock.json');
-      if (!res.ok) throw new Error("Failed to fetch stock");
-      stock = await res.json();
-      document.getElementById("loading-screen").classList.add("hidden");
-      document.getElementById("pin-screen").classList.remove("hidden");
-      document.title = "RekietaLabs POS - Login";
-    } catch (err) {
-      document.getElementById("loading-screen").innerHTML = "<h2>Error loading stock. Refresh the page.</h2>";
-      console.error(err);
-    }
-  }
+// --- Startup ---
+window.addEventListener('load', async () => {
+  document.title = "RekietaLabs POS - Loading";
 
-  init();
-
-  // --- Login ---
-  async function login() {
-    const pin = document.getElementById("pin-input").value;
-    try {
-      const res = await fetch(`${API_BASE}/pos`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "validate-pin", pin })
-      });
-      const data = await res.json();
-      if (data.success) {
-        document.getElementById("pin-screen").classList.add("hidden");
-        document.getElementById("pos-screen").classList.remove("hidden");
-        document.title = "RekietaLabs POS - Active";
-        renderProducts();
-      } else {
-        document.getElementById("pin-error").innerText = "Invalid PIN.";
-      }
-    } catch (err) {
-      document.getElementById("pin-error").innerText = "Error contacting API.";
-    }
-  }
-
-  // --- Render Products ---
-  function renderProducts() {
-    const container = document.getElementById("products");
-    container.innerHTML = "";
-    stock.forEach((item, idx) => {
-      const btn = document.createElement("button");
-      btn.className = "product-btn";
-      btn.innerText = `${item.name} - $${item.price.toFixed(2)} (${item.stock} left)`;
-      btn.onclick = () => addToCart(idx);
-      container.appendChild(btn);
+  // Load stock from API
+  try {
+    const res = await fetch(`${API_BASE}/pos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "get-stock" })
     });
-  }
-
-  // --- Cart Management ---
-  function addToCart(idx) {
-    const product = stock[idx];
-    if (product.stock <= 0) return alert("Out of stock!");
-    const existing = cart.find(c => c.id === product.id);
-    if (existing) existing.qty++;
-    else cart.push({ id: product.id, name: product.name, qty: 1, price: product.price });
-    renderCart();
-  }
-
-  function renderCart() {
-    const container = document.getElementById("cart");
-    container.innerHTML = "";
-    cart.forEach(item => {
-      const div = document.createElement("div");
-      div.className = "cart-item";
-      div.innerText = `${item.name} x ${item.qty}`;
-      container.appendChild(div);
-    });
-  }
-
-  // --- Checkout ---
-  function checkout() {
-    if(cart.length === 0) return alert("Cart is empty!");
-    document.getElementById("pos-screen").classList.add("hidden");
-    document.getElementById("checkout-screen").classList.remove("hidden");
-    document.title = "RekietaLabs POS - Checkout";
-  }
-
-  async function finishCheckout(payment) {
-    const email = document.getElementById("customer-email").value;
-    try {
-      const res = await fetch(`${API_BASE}/pos`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "checkout", items: cart, payment, email })
-      });
-      const data = await res.json();
-      if (data.success) {
-        document.getElementById("checkout-result").innerHTML =
-          `✅ Success! <a href="${data.receiptUrl}" target="_blank">View Receipt</a>`;
-        // Update stock locally only after checkout succeeds
-        cart.forEach(cItem => {
-          const prod = stock.find(p => p.id === cItem.id);
-          if(prod) prod.stock -= cItem.qty;
-        });
-        cart = [];
-        renderProducts();
-        setTimeout(() => {
-          document.getElementById("checkout-screen").classList.add("hidden");
-          document.getElementById("pos-screen").classList.remove("hidden");
-          document.getElementById("checkout-result").innerText = "";
-        }, 3000);
-      } else {
-        document.getElementById("checkout-result").innerText = "❌ " + data.message;
-      }
-    } catch(err) {
-      document.getElementById("checkout-result").innerText = "Error contacting API.";
+    const data = await res.json();
+    if(data.success) {
+      stock = data.stock;
+      tempStock = JSON.parse(JSON.stringify(stock)); // deep copy
+    } else {
+      document.getElementById("subtitle").innerText = "Error loading stock.";
     }
+  } catch(err) {
+    document.getElementById("subtitle").innerText = "Error loading stock.";
   }
 
-  function cancelCheckout() {
-    document.getElementById("checkout-screen").classList.add("hidden");
-    document.getElementById("pos-screen").classList.remove("hidden");
-    document.title = "RekietaLabs POS - Active";
-  }
-
-  function signOut() {
-    cart = [];
-    document.getElementById("pos-screen").classList.add("hidden");
+  setTimeout(() => {
+    document.getElementById("loading-screen").classList.add("hidden");
     document.getElementById("pin-screen").classList.remove("hidden");
     document.title = "RekietaLabs POS - Login";
-    document.getElementById("pin-input").value = "";
-    document.getElementById("pin-error").innerText = "";
-  }
+  }, 5000);
+});
 
+// --- PIN Login ---
+async function login() {
+  const pin = document.getElementById("pin-input").value;
+  try {
+    const res = await fetch(`${API_BASE}/pos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "validate-pin", pin })
+    });
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById("pin-screen").classList.add("hidden");
+      document.getElementById("pos-screen").classList.remove("hidden");
+      cart = [];
+      tempStock = JSON.parse(JSON.stringify(stock));
+      loadProducts();
+      renderCart();
+      document.title = "RekietaLabs POS - Active";
+    } else {
+      document.getElementById("pin-error").innerText = "Invalid PIN.";
+    }
+  } catch (err) {
+    document.getElementById("pin-error").innerText = "Error contacting API.";
+  }
+}
+
+// --- Load Products ---
+function loadProducts() {
+  const container = document.getElementById("products");
+  container.innerHTML = "";
+  tempStock.forEach((item, idx) => {
+    const btn = document.createElement("button");
+    btn.innerHTML = `${item.name} - $${item.price.toFixed(2)} (${item.stock} left)` +
+                    (item.stock === 1 ? ' <span class="low-stock">LOW STOCK!</span>' : '');
+    btn.onclick = () => addToCart(idx);
+    container.appendChild(btn);
+  });
+}
+
+// --- Cart ---
+function addToCart(idx) {
+  const product = tempStock[idx];
+  if (product.stock <= 0) return alert("Out of stock!");
+  product.stock -= 1;
+
+  const existing = cart.find(c => c.id === product.id);
+  if (existing) existing.qty++;
+  else cart.push({ id: product.id, name: product.name, qty: 1, price: product.price });
+
+  renderCart();
+  loadProducts();
+}
+
+function renderCart() {
+  const container = document.getElementById("cart");
+  container.innerHTML = "";
+  cart.forEach(item => {
+    const div = document.createElement("div");
+    div.className = "cart-item";
+    div.innerText = `${item.name} x ${item.qty}`;
+    container.appendChild(div);
+  });
+}
+
+// --- Checkout ---
+function checkout() {
+  document.getElementById("pos-screen").classList.add("hidden");
+  document.getElementById("checkout-screen").classList.remove("hidden");
+  document.title = "RekietaLabs POS - Checkout";
+}
+
+function cancelCheckout() {
+  // Restore temp stock and clear cart
+  tempStock = JSON.parse(JSON.stringify(stock));
+  cart = [];
+  document.getElementById("checkout-screen").classList.add("hidden");
+  document.getElementById("pos-screen").classList.remove("hidden");
+  loadProducts();
+  renderCart();
+  document.title = "RekietaLabs POS - Active";
+}
+
+// --- Finish Checkout ---
+async function finishCheckout(payment) {
+  const email = document.getElementById("customer-email").value;
+  if(cart.length === 0) return alert("Cart is empty.");
+
+  try {
+    const res = await fetch(`${API_BASE}/pos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "checkout", items: cart, payment, email })
+    });
+    const data = await res.json();
+    if (data.success) {
+      // Persist temp stock to real stock
+      stock = JSON.parse(JSON.stringify(tempStock));
+      cart = [];
+
+      document.getElementById("checkout-result").innerHTML =
+        `✅ Success! <a href="${data.receiptUrl}" target="_blank">View Receipt</a>`;
+
+      // Return to POS after 3 seconds
+      setTimeout(() => {
+        document.getElementById("checkout-screen").classList.add("hidden");
+        document.getElementById("pos-screen").classList.remove("hidden");
+        loadProducts();
+        renderCart();
+        document.getElementById("customer-email").value = '';
+        document.getElementById("checkout-result").innerHTML = '';
+        document.title = "RekietaLabs POS - Active";
+      }, 3000);
+    } else {
+      document.getElementById("checkout-result").innerText = "❌ " + data.message;
+    }
+  } catch (err) {
+    document.getElementById("checkout-result").innerText = "Error contacting API.";
+  }
+}
+
+// --- Sign Out ---
+function signOut() {
+  cart = [];
+  tempStock = JSON.parse(JSON.stringify(stock));
+  document.getElementById("pos-screen").classList.add("hidden");
+  document.getElementById("pin-screen").classList.remove("hidden");
+  document.getElementById("pin-input").value = '';
+  document.title = "RekietaLabs POS - Login";
+}
 </script>
 </body>
 </html>
