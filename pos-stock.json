@@ -45,13 +45,13 @@
     "id": "prod008",
     "name": "Vanilla Ice Cream",
     "price": 3,
-    "stock": 15
+    "stock": 13
   },
   {
     "id": "prod009",
     "name": "Chocolate Ice Cream",
     "price": 3,
-    "stock": 15
+    "stock": 14
   },
   {
     "id": "prod010",
@@ -69,12 +69,12 @@
     "id": "prod012",
     "name": "Chocolate Milkshake",
     "price": 4,
-    "stock": 20
+    "stock": 18
   },
   {
     "id": "prod013",
     "name": "Strawberry Milkshake",
     "price": 4,
-    "stock": 14
+    "stock": 10
   }
 ]
