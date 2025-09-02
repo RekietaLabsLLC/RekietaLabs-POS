@@ -15,19 +15,19 @@
     "id": "prod003",
     "name": "Bacon Burger",
     "price": 7,
-    "stock": 8
+    "stock": 7
   },
   {
     "id": "prod004",
     "name": "Chicken Wings",
     "price": 4.5,
-    "stock": 24
+    "stock": 23
   },
   {
     "id": "prod005",
     "name": "Chicken Nuggets",
     "price": 4,
-    "stock": 28
+    "stock": 27
   },
   {
     "id": "prod006",
@@ -39,25 +39,25 @@
     "id": "prod007",
     "name": "Fries",
     "price": 2.5,
-    "stock": 39
+    "stock": 38
   },
   {
     "id": "prod008",
     "name": "Vanilla Ice Cream",
     "price": 3,
-    "stock": 11
+    "stock": 10
   },
   {
     "id": "prod009",
     "name": "Chocolate Ice Cream",
     "price": 3,
-    "stock": 13
+    "stock": 12
   },
   {
     "id": "prod010",
     "name": "Strawberry Ice Cream",
     "price": 3,
-    "stock": 12
+    "stock": 10
   },
   {
     "id": "prod011",
@@ -75,6 +75,6 @@
     "id": "prod013",
     "name": "Strawberry Milkshake",
     "price": 4,
-    "stock": 9
+    "stock": 8
   }
 ]
