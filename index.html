@@ -84,28 +84,22 @@ const API_BASE = window.location.hostname.includes("localhost")
   ? "http://localhost:10000"
   : "https://api.rekietalabs.com";
 
+// GitHub raw URL for pos-stock.json
+const GITHUB_RAW_URL = "https://raw.githubusercontent.com/YOUR_GITHUB_USERNAME/YOUR_POS_REPO/main/pos-stock.json";
+
 let cart = [];
-let stock = []; // real stock from pos-stock.json
+let stock = []; // stock loaded from GitHub
 let tempStock = []; // temporary stock for UI
 
 // --- Startup ---
 window.addEventListener('load', async () => {
   document.title = "RekietaLabs POS - Loading";
 
-  // Load stock from API
+  // Load stock directly from GitHub raw file
   try {
-    const res = await fetch(`${API_BASE}/pos`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "get-stock" })
-    });
-    const data = await res.json();
-    if(data.success) {
-      stock = data.stock;
-      tempStock = JSON.parse(JSON.stringify(stock)); // deep copy
-    } else {
-      document.getElementById("subtitle").innerText = "Error loading stock.";
-    }
+    const res = await fetch(GITHUB_RAW_URL);
+    stock = await res.json();
+    tempStock = JSON.parse(JSON.stringify(stock));
   } catch(err) {
     document.getElementById("subtitle").innerText = "Error loading stock.";
   }
@@ -189,7 +183,6 @@ function checkout() {
 }
 
 function cancelCheckout() {
-  // Restore temp stock and clear cart
   tempStock = JSON.parse(JSON.stringify(stock));
   cart = [];
   document.getElementById("checkout-screen").classList.add("hidden");
@@ -219,7 +212,6 @@ async function finishCheckout(payment) {
       document.getElementById("checkout-result").innerHTML =
         `✅ Success! <a href="${data.receiptUrl}" target="_blank">View Receipt</a>`;
 
-      // Return to POS after 3 seconds
       setTimeout(() => {
         document.getElementById("checkout-screen").classList.add("hidden");
         document.getElementById("pos-screen").classList.remove("hidden");
