@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RekietaLabs POS - Loading</title>
 <link rel="icon" href="IMG_0926.jpeg" type="image/jpeg">
 <style>
@@ -11,9 +10,16 @@
     background: #0a0a0a;
     color: #1753aa;
     text-align: center;
+    margin: 0;
+    padding: 0;
+  }
+
+  #loading-screen, #pin-screen, #pos-screen, #checkout-screen {
+    display: none;
     padding: 50px;
   }
-  .hidden { display: none; }
+
+  h1, h2, h3 { color: #1753aa; }
   input, button {
     padding: 10px;
     margin: 10px;
@@ -25,185 +31,177 @@
   button { cursor: pointer; }
   #cart { margin-top: 20px; }
   .cart-item { margin: 5px 0; }
-  .low-stock { color: #ff5555; font-weight: bold; }
-  img.logo { width: 80px; height: 80px; border-radius: 50%; }
+
+  .low-stock { color: #ff5555; }
 </style>
 </head>
 <body>
-<h1 id="main-title"><img src="IMG_0926.jpeg" class="logo"><br>Hello! Welcome to RekietaLabs POS.</h1>
-<h3 id="subtitle">System Loading...</h3>
 
-<div id="pin-screen" class="hidden">
+<!-- Loading Screen -->
+<div id="loading-screen">
+  <h1>Loading RekietaLabs POS...</h1>
+  <img src="IMG_0926.jpeg" style="width:100px; border-radius:50%;">
+</div>
+
+<!-- PIN Login -->
+<div id="pin-screen">
   <h2>Enter Employee PIN</h2>
   <input type="password" id="pin-input" placeholder="Enter PIN">
   <button onclick="login()">Login</button>
-  <button onclick="signOut()">Sign Out</button>
   <p id="pin-error" style="color:red;"></p>
 </div>
 
-<div id="pos-screen" class="hidden">
-  <h2>Products</h2>
+<!-- POS Screen -->
+<div id="pos-screen">
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <h2>Products</h2>
+    <button id="signout-btn" onclick="signOut()">Sign Out</button>
+  </div>
   <div id="products"></div>
 
   <h2>Cart</h2>
   <div id="cart"></div>
+  <h3>Total: $<span id="cart-total">0.00</span></h3>
 
   <button onclick="checkout()">Checkout</button>
-  <button onclick="signOut()">Sign Out</button>
 </div>
 
-<div id="checkout-screen" class="hidden">
+<!-- Checkout Screen -->
+<div id="checkout-screen">
   <h2>Checkout</h2>
-  <p id="checkout-total"></p>
+  <p>Total: $<span id="checkout-total">0.00</span></p>
   <label>Email (optional): <input type="email" id="customer-email"></label><br>
   <button onclick="finishCheckout('Card')">💳 Card</button>
   <button onclick="finishCheckout('Cash')">💵 Cash</button>
-  <button onclick="cancelCheckout()">Cancel</button>
   <p id="checkout-result"></p>
 </div>
 
 <script>
-  const API_BASE = window.location.hostname.includes("localhost")
-    ? "http://localhost:10000"
-    : "https://api.rekietalabs.com";
+const repoRawUrl = "https://raw.githubusercontent.com/RekietaLabsLLC/RekietaLabs-POS/main/pos-stock.json";
 
-  let cart = [];
-  let stock = [];
+let cart = [];
+let stock = [];
 
-  // --- Startup ---
-  setTimeout(() => {
-    document.title = "RekietaLabs POS - Login";
-    document.getElementById("subtitle").classList.add("hidden");
-    document.getElementById("pin-screen").classList.remove("hidden");
-  }, 5000);
+// --- Loading screen ---
+document.getElementById("loading-screen").style.display = "block";
+setTimeout(() => {
+  document.getElementById("loading-screen").style.display = "none";
+  document.getElementById("pin-screen").style.display = "block";
+}, 2000);
 
-  // --- Sign Out ---
-  function signOut() {
-    cart = [];
-    stock = [];
-    document.getElementById("pos-screen").classList.add("hidden");
-    document.getElementById("checkout-screen").classList.add("hidden");
-    document.getElementById("pin-screen").classList.remove("hidden");
-    document.getElementById("pin-input").value = "";
-    document.title = "RekietaLabs POS - Login";
+// --- Fetch stock ---
+async function fetchStock() {
+  try {
+    const res = await fetch(repoRawUrl);
+    stock = await res.json();
+  } catch (err) {
+    alert("Error loading stock");
   }
+}
 
-  // --- PIN Login ---
-  async function login() {
-    const pin = document.getElementById("pin-input").value;
-    try {
-      const res = await fetch(`${API_BASE}/pos`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "validate-pin", pin })
-      });
-      const data = await res.json();
-      if (data.success) {
-        document.title = "RekietaLabs POS - Active";
-        document.getElementById("pin-screen").classList.add("hidden");
-        document.getElementById("pos-screen").classList.remove("hidden");
-        await loadStockFromGitHub();
-        renderProducts();
-      } else {
-        document.getElementById("pin-error").innerText = "Invalid PIN.";
-      }
-    } catch (err) {
-      document.getElementById("pin-error").innerText = "Error contacting API.";
-    }
+// --- Login ---
+async function login() {
+  const pin = document.getElementById("pin-input").value;
+  const res = await fetch("/pos", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ action: "validate-pin", pin })
+  });
+  const data = await res.json();
+  if(data.success){
+    document.getElementById("pin-screen").style.display = "none";
+    document.getElementById("pos-screen").style.display = "block";
+    await fetchStock();
+    loadProducts();
+  } else {
+    document.getElementById("pin-error").innerText = "Invalid PIN";
   }
+}
 
-  // --- Load Stock from GitHub ---
-  async function loadStockFromGitHub() {
-    try {
-      const res = await fetch('https://raw.githubusercontent.com/RekietaLabsLLC/RekietaLabs-POS/main/pos-stock.json');
-      if (!res.ok) throw new Error('Failed to fetch stock');
-      stock = await res.json();
-    } catch (err) {
-      console.error('Error loading stock:', err);
-      alert('Error loading stock from GitHub.');
-    }
-  }
+// --- Sign Out ---
+function signOut() {
+  cart = [];
+  document.getElementById("pos-screen").style.display = "none";
+  document.getElementById("pin-screen").style.display = "block";
+  document.getElementById("pin-input").value = "";
+  document.getElementById("pin-error").innerText = "";
+  document.getElementById("cart").innerHTML = "";
+  document.getElementById("cart-total").innerText = "0.00";
+}
 
-  // --- Render Products ---
-  function renderProducts() {
-    const container = document.getElementById("products");
-    container.innerHTML = "";
-    stock.forEach((item, idx) => {
-      const btn = document.createElement("button");
-      btn.innerText = `${item.name} - $${item.price} (${item.stock} left)`;
-      if (item.stock <= 1) btn.classList.add("low-stock");
-      btn.onclick = () => addToCart(idx);
-      container.appendChild(btn);
+// --- Load Products ---
+function loadProducts() {
+  const container = document.getElementById("products");
+  container.innerHTML = "";
+  stock.forEach((item, idx) => {
+    const btn = document.createElement("button");
+    btn.innerText = `${item.name} - $${item.price} (${item.stock} left)`;
+    if(item.stock <= 1) btn.classList.add("low-stock");
+    btn.onclick = () => addToCart(idx);
+    container.appendChild(btn);
+  });
+}
+
+// --- Cart ---
+function addToCart(idx) {
+  const product = stock[idx];
+  if(product.stock <= 0) return alert("Out of stock!");
+  // Do not update stock yet
+  const existing = cart.find(c => c.id === product.id);
+  if(existing) existing.qty++;
+  else cart.push({ id: product.id, name: product.name, price: product.price, qty: 1 });
+  renderCart();
+}
+
+function renderCart() {
+  const container = document.getElementById("cart");
+  container.innerHTML = "";
+  let total = 0;
+  cart.forEach(item => {
+    const div = document.createElement("div");
+    div.className = "cart-item";
+    div.innerText = `${item.name} x ${item.qty}`;
+    container.appendChild(div);
+    total += item.price * item.qty;
+  });
+  document.getElementById("cart-total").innerText = total.toFixed(2);
+}
+
+// --- Checkout ---
+function checkout() {
+  if(cart.length === 0) return alert("Cart is empty");
+  document.getElementById("pos-screen").style.display = "none";
+  document.getElementById("checkout-screen").style.display = "block";
+  document.getElementById("checkout-total").innerText = document.getElementById("cart-total").innerText;
+}
+
+async function finishCheckout(payment) {
+  const email = document.getElementById("customer-email").value;
+  try {
+    const res = await fetch("/pos", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ action:"checkout", items: cart, payment, email })
     });
-  }
-
-  // --- Cart Management ---
-  function addToCart(idx) {
-    const product = stock[idx];
-    if (product.stock <= 0) return alert("Out of stock!");
-    const existing = cart.find(c => c.id === product.id);
-    if (existing) existing.qty++;
-    else cart.push({ id: product.id, name: product.name, price: product.price, qty: 1 });
-    renderCart();
-  }
-
-  function renderCart() {
-    const container = document.getElementById("cart");
-    container.innerHTML = "";
-    cart.forEach(item => {
-      const div = document.createElement("div");
-      div.className = "cart-item";
-      div.innerText = `${item.name} x ${item.qty}`;
-      container.appendChild(div);
-    });
-  }
-
-  // --- Checkout ---
-  function checkout() {
-    if(cart.length === 0) return alert("Cart is empty!");
-    document.getElementById("pos-screen").classList.add("hidden");
-    document.getElementById("checkout-screen").classList.remove("hidden");
-    document.title = "RekietaLabs POS - Checkout";
-    renderCheckoutTotal();
-  }
-
-  function renderCheckoutTotal() {
-    const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-    document.getElementById("checkout-total").innerText = `Total: $${total.toFixed(2)}`;
-  }
-
-  async function finishCheckout(payment) {
-    const email = document.getElementById("customer-email").value;
-    try {
-      const res = await fetch(`${API_BASE}/pos`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "checkout", items: cart, email, payment })
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert(`✅ Success! Receipt: ${data.receiptUrl}`);
-        // Clear cart after checkout
-        cart = [];
-        // Refresh stock from GitHub
-        await loadStockFromGitHub();
-        document.getElementById("checkout-screen").classList.add("hidden");
-        document.getElementById("pos-screen").classList.remove("hidden");
-        renderProducts();
-      } else {
-        alert("❌ " + data.message);
-      }
-    } catch (err) {
-      alert("Error contacting API.");
+    const data = await res.json();
+    if(data.success){
+      document.getElementById("checkout-result").innerHTML = `✅ Success! <a href="${data.receiptUrl}" target="_blank">View Receipt</a>`;
+      // Clear cart and return to POS screen
+      cart = [];
+      document.getElementById("cart").innerHTML = "";
+      document.getElementById("cart-total").innerText = "0.00";
+      setTimeout(() => {
+        document.getElementById("checkout-screen").style.display = "none";
+        document.getElementById("pos-screen").style.display = "block";
+        document.getElementById("customer-email").value = "";
+      }, 3000);
+    } else {
+      document.getElementById("checkout-result").innerText = "❌ "+data.message;
     }
+  } catch(err) {
+    document.getElementById("checkout-result").innerText = "Error contacting API.";
   }
-
-  function cancelCheckout() {
-    cart = [];
-    document.getElementById("checkout-screen").classList.add("hidden");
-    document.getElementById("pos-screen").classList.remove("hidden");
-    renderProducts();
-  }
+}
 </script>
 </body>
 </html>
