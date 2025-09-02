@@ -3,7 +3,7 @@
     "id": "prod001",
     "name": "Classic Burger",
     "price": 5,
-    "stock": 19
+    "stock": 11
   },
   {
     "id": "prod002",
@@ -75,6 +75,6 @@
     "id": "prod013",
     "name": "Strawberry Milkshake",
     "price": 4,
-    "stock": 17
+    "stock": 14
   }
 ]
