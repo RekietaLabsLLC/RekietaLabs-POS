@@ -25,15 +25,7 @@
     #logo {
       width: 120px;
       border-radius: 50%;
-    }
-
-    #loading-screen #logo {
-      animation: rotateLogo 3s linear infinite;
-    }
-
-    @keyframes rotateLogo {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
+      margin-bottom: 20px;
     }
 
     input, button {
@@ -48,10 +40,17 @@
 
     button { cursor: pointer; }
 
+    /* Product Grid */
+    #products {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      justify-items: center;
+      margin-bottom: 30px;
+    }
+
     #products button {
-      display: block;
-      margin: 5px auto;
-      width: 200px;
+      width: 100%;
     }
 
     #cart { margin-top: 20px; }
@@ -59,6 +58,7 @@
     .low-stock { color: #ff5555; font-weight: bold; }
 
     #checkout-total { margin-top: 10px; font-size: 1.2em; color: #fff; }
+
   </style>
 </head>
 <body>
@@ -74,9 +74,7 @@
   <div id="login-screen" class="screen">
     <h2>Enter Employee PIN</h2>
     <input type="password" id="pin-input" placeholder="Enter PIN">
-    <div>
-      <button onclick="login()">Login</button>
-    </div>
+    <button onclick="login()">Login</button>
     <p id="pin-error" style="color:red;"></p>
   </div>
 
@@ -87,10 +85,10 @@
 
     <h2>Cart</h2>
     <div id="cart"></div>
-    <div id="checkout-total"></div>
+    <div id="checkout-total">Total: $0.00</div>
 
     <button onclick="checkout()">Checkout</button>
-    <button onclick="logout()">Sign Out</button>
+    <button onclick="signOut()">Sign Out</button>
   </div>
 
   <!-- Checkout Screen -->
@@ -99,140 +97,130 @@
     <label>Email (optional): <input type="email" id="customer-email"></label><br>
     <button onclick="finishCheckout('Card')">💳 Card</button>
     <button onclick="finishCheckout('Cash')">💵 Cash</button>
-    <button onclick="cancelCheckout()">Cancel</button>
     <p id="checkout-result"></p>
+    <button onclick="cancelCheckout()">Back to POS</button>
   </div>
 
 <script>
+  // API Base (for optional API calls, e.g., PIN validation)
   const API_BASE = window.location.hostname.includes("localhost")
     ? "http://localhost:10000"
     : "https://api.rekietalabs.com";
 
-  // State
   let cart = [];
   let stock = [];
 
-  // --- Loading screen ---
-  setTimeout(() => {
-    document.getElementById("loading-screen").classList.remove("active");
-    document.getElementById("login-screen").classList.add("active");
-  }, 3000);
-
-  // --- Load Stock from public JSON ---
+  // --- Load stock from local JSON repo ---
   async function loadStock() {
     try {
-      const res = await fetch('https://raw.githubusercontent.com/RekietaLabsLLC/RekietaLabs-POS/main/pos-stock.json');
+      const res = await fetch('pos-stock.json');
       stock = await res.json();
     } catch (err) {
       console.error(err);
-      alert('Error loading stock!');
+      alert("Error loading stock.");
     }
   }
 
-  loadStock();
+  // --- Show only one screen ---
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
 
-  // --- Login ---
-  async function login() {
-    const pin = document.getElementById("pin-input").value;
-    try {
-      const res = await fetch(`${API_BASE}/pos`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "validate-pin", pin })
-      });
-      const data = await res.json();
-      if(data.success) {
-        document.getElementById("login-screen").classList.remove("active");
-        document.getElementById("pos-screen").classList.add("active");
-        renderProducts();
-      } else {
-        document.getElementById("pin-error").innerText = "Invalid PIN.";
-      }
-    } catch(err) {
-      document.getElementById("pin-error").innerText = "Error contacting API.";
+  // --- Startup ---
+  window.addEventListener('DOMContentLoaded', async () => {
+    await loadStock();
+    setTimeout(() => {
+      showScreen('login-screen');
+    }, 2000);
+  });
+
+  // --- PIN Login ---
+  const pins = ["7606","4646"];
+  function login() {
+    const pin = document.getElementById('pin-input').value;
+    if (pins.includes(pin)) {
+      cart = [];
+      renderCart();
+      showScreen('pos-screen');
+      loadProducts();
+    } else {
+      document.getElementById('pin-error').innerText = "Invalid PIN";
     }
   }
 
-  function logout() {
-    cart = [];
-    document.getElementById("pos-screen").classList.remove("active");
-    document.getElementById("login-screen").classList.add("active");
-    document.getElementById("pin-input").value = '';
+  function signOut() {
+    document.getElementById('pin-input').value = '';
+    showScreen('login-screen');
   }
 
-  // --- Products & Cart ---
-  function renderProducts() {
-    const container = document.getElementById("products");
+  // --- Products ---
+  function loadProducts() {
+    const container = document.getElementById('products');
     container.innerHTML = '';
     stock.forEach((item, idx) => {
-      const btn = document.createElement("button");
+      const btn = document.createElement('button');
       btn.innerText = `${item.name} - $${item.price.toFixed(2)} (${item.stock} left)`;
-      if(item.stock <= 1) btn.innerHTML += " <span class='low-stock'>LOW!</span>";
+      if (item.stock <= 1) btn.innerHTML += ' ⚠️ Low';
       btn.onclick = () => addToCart(idx);
       container.appendChild(btn);
     });
-    renderCart();
   }
 
   function addToCart(idx) {
-    const product = stock[idx];
-    if(product.stock <= 0) return alert("Out of stock!");
-    const existing = cart.find(c => c.id === product.id);
-    if(existing) existing.qty++;
-    else cart.push({ id: product.id, name: product.name, price: product.price, qty: 1 });
+    const item = stock[idx];
+    if (item.stock <= 0) return alert("Out of stock!");
+    item.stock -= 1;
+    const existing = cart.find(c => c.id === item.id);
+    if (existing) existing.qty++;
+    else cart.push({ ...item, qty: 1 });
     renderCart();
+    loadProducts();
   }
 
   function renderCart() {
-    const container = document.getElementById("cart");
+    const container = document.getElementById('cart');
     container.innerHTML = '';
     let total = 0;
     cart.forEach(item => {
-      const div = document.createElement("div");
-      div.className = "cart-item";
+      total += item.price * item.qty;
+      const div = document.createElement('div');
+      div.className = 'cart-item';
       div.innerText = `${item.name} x ${item.qty}`;
       container.appendChild(div);
-      total += item.qty * item.price;
     });
-    document.getElementById("checkout-total").innerText = `Total: $${total.toFixed(2)}`;
+    document.getElementById('checkout-total').innerText = `Total: $${total.toFixed(2)}`;
   }
 
   // --- Checkout ---
   function checkout() {
     if(cart.length === 0) return alert("Cart is empty!");
-    document.getElementById("pos-screen").classList.remove("active");
-    document.getElementById("checkout-screen").classList.add("active");
+    showScreen('checkout-screen');
   }
 
   function cancelCheckout() {
+    // Return stock to inventory
+    cart.forEach(item => {
+      const stockItem = stock.find(s => s.id === item.id);
+      if(stockItem) stockItem.stock += item.qty;
+    });
     cart = [];
-    document.getElementById("checkout-screen").classList.remove("active");
-    document.getElementById("pos-screen").classList.add("active");
-    renderProducts();
+    renderCart();
+    loadProducts();
+    showScreen('pos-screen');
   }
 
-  async function finishCheckout(payment) {
-    const email = document.getElementById("customer-email").value;
-    try {
-      const res = await fetch(`${API_BASE}/pos`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "checkout", items: cart, payment, email })
-      });
-      const data = await res.json();
-      if(data.success){
-        alert("Checkout successful!");
-        cart = [];
-        document.getElementById("checkout-screen").classList.remove("active");
-        document.getElementById("pos-screen").classList.add("active");
-        renderProducts();
-      } else {
-        document.getElementById("checkout-result").innerText = "❌ " + data.message;
-      }
-    } catch(err){
-      document.getElementById("checkout-result").innerText = "Error contacting API.";
-    }
+  function finishCheckout(payment) {
+    const email = document.getElementById('customer-email').value;
+    // Here you would call your POS API to create the receipt
+    alert(`Checkout complete with ${payment}. Email: ${email || 'N/A'}`);
+    cart = [];
+    renderCart();
+    loadProducts();
+    document.getElementById('customer-email').value = '';
+    showScreen('pos-screen');
   }
+
 </script>
 </body>
 </html>
